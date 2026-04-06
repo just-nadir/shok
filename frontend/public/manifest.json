@@ -1,0 +1,25 @@
+{
+  "name": "Shok Taksi Baholash",
+  "short_name": "Shok Taksi",
+  "description": "Shok Taksi haydovchi baholash tizimi",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait",
+  "theme_color": "#1d4ed8",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
