@@ -14,8 +14,8 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
 
 // POST /api/complaints — mijoz shikoyat yuboradi (autentifikatsiya shart emas)
 router.post('/', async (req: Request, res: Response): Promise<void> => {
-  const { driverQrCode, phone, message } = req.body as {
-    driverQrCode?: string; phone?: string; message?: string;
+  const { driverQrCode, driverId: bodyDriverId, phone, message } = req.body as {
+    driverQrCode?: string; driverId?: string; phone?: string; message?: string;
   };
 
   if (!message?.trim()) {
@@ -24,7 +24,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   let driverId: string | null = null;
-  if (driverQrCode) {
+  if (bodyDriverId) {
+    const r = await query<{ id: string }>('SELECT id FROM drivers WHERE id = $1 LIMIT 1', [bodyDriverId]);
+    if (r.rows.length > 0) driverId = r.rows[0].id;
+  } else if (driverQrCode) {
     const r = await query<{ id: string }>('SELECT id FROM drivers WHERE qr_code = $1 LIMIT 1', [driverQrCode]);
     if (r.rows.length > 0) driverId = r.rows[0].id;
   }

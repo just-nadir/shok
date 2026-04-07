@@ -5,8 +5,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 
 const OTPVerify = React.lazy(() => import('./pages/OTPVerify'));
+const ComplaintForm = React.lazy(() => import('./pages/ComplaintForm'));
 const DriverSearch = React.lazy(() => import('./pages/DriverSearch'));
-const RatingForm = React.lazy(() => import('./pages/RatingForm'));
 const DriverLogin = React.lazy(() => import('./pages/DriverLogin'));
 const DriverDashboard = React.lazy(() => import('./pages/DriverDashboard'));
 const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
@@ -23,7 +23,7 @@ export default function App() {
           <Routes>
             <Route path="/otp" element={<OTPVerify />} />
             <Route path="/search" element={<DriverSearch />} />
-            <Route path="/r/:qrCode" element={<RatingForm />} />
+            <Route path="/r/:driverId" element={<ComplaintForm />} />
             <Route path="/driver/login" element={<DriverLogin />} />
             <Route
               path="/driver/dashboard"

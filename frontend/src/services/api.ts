@@ -48,8 +48,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // --- Public endpoints ---
 
-export function getDriverByQrCode(qrCode: string): Promise<Driver> {
-  return request<Driver>(`/driver/${encodeURIComponent(qrCode)}`);
+export function getDriver(driverId: string): Promise<Driver> {
+  return request<Driver>(`/drivers/${encodeURIComponent(driverId)}`);
 }
 
 export function submitRating(data: RatingRequest): Promise<{ message: string }> {

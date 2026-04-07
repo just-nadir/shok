@@ -2,14 +2,14 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import StarRating from '../components/StarRating';
 import CategoryRating from '../components/CategoryRating';
-import { getDriverByQrCode, submitRating, ApiError } from '../services/api';
+import { getDriver, submitRating, ApiError } from '../services/api';
 import { saveOfflineRating, triggerBackgroundSync } from '../services/offlineQueue';
 import type { Driver, RatingRequest } from '../types';
 
 type CategoryValue = 'good' | 'average' | 'bad';
 
 export default function RatingForm() {
-  const { qrCode } = useParams<{ qrCode: string }>();
+  const { driverId } = useParams<{ driverId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -34,16 +34,16 @@ export default function RatingForm() {
 
   // Redirect if no phone
   useEffect(() => {
-    if (!phone && qrCode) {
-      navigate(`/otp?qr=${encodeURIComponent(qrCode)}`, { replace: true });
+    if (!phone && driverId) {
+      navigate(`/otp?dr=${encodeURIComponent(driverId)}`, { replace: true });
     }
-  }, [phone, qrCode, navigate]);
+  }, [phone, driverId, navigate]);
 
   // Fetch driver info
   useEffect(() => {
-    if (!qrCode) return;
+    if (!driverId) return;
     setLoadingDriver(true);
-    getDriverByQrCode(qrCode)
+    getDriver(driverId)
       .then((d) => {
         if (d.isBlocked) {
           setDriverError('Bu haydovchi hozirda baholanmaydi');
@@ -75,10 +75,10 @@ export default function RatingForm() {
       return;
     }
 
-    if (!qrCode || !phone) return;
+    if (!driverId || !phone) return;
 
     const data: RatingRequest = {
-      driverQrCode: qrCode,
+      driverId,
       phone,
       overallRating: overallRating as 1 | 2 | 3 | 4 | 5,
       ...(cleanliness && { cleanliness }),

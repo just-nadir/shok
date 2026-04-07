@@ -45,7 +45,7 @@ export default function DriverSearch() {
   }, [query]);
 
   const handleSelect = (driver: Driver) => {
-    navigate(`/r/${encodeURIComponent(driver.qrCode)}?phone=${encodeURIComponent(phone)}`);
+    navigate(`/r/${encodeURIComponent(driver.id)}?phone=${encodeURIComponent(phone)}`);
   };
 
   return (

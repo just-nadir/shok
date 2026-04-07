@@ -7,14 +7,13 @@ export interface Driver {
   carColor?: string;
   avatarUrl?: string;
   phone?: string;
-  qrCode: string;
   isBlocked: boolean;
 }
 
 // Baholash so'rovi
 export interface RatingRequest {
-  driverQrCode: string;
-  phone: string; // OTP tasdiqlangan telefon
+  driverId: string;
+  phone: string;
   overallRating: 1 | 2 | 3 | 4 | 5;
   cleanliness?: 'good' | 'average' | 'bad';
   politeness?: 'good' | 'average' | 'bad';

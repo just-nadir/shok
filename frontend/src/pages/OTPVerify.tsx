@@ -44,7 +44,7 @@ function isPhoneComplete(formatted: string): boolean {
 export default function OTPVerify() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const qrCode = searchParams.get('qr');
+  const qrCode = searchParams.get('dr');
 
   const [step, setStep] = useState<Step>('phone');
   const [phoneDisplay, setPhoneDisplay] = useState('');
