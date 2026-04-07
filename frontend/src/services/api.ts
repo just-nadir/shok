@@ -73,10 +73,17 @@ export function verifyOtp(phone: string, code: string): Promise<{ message: strin
   });
 }
 
-export function driverLogin(username: string, password: string): Promise<{ message: string }> {
+export function driverSendOtp(phone: string): Promise<{ message: string }> {
   return request<{ message: string }>('/auth/driver/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export function driverVerifyOtp(phone: string, code: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/auth/driver/login', {
+    method: 'POST',
+    body: JSON.stringify({ phone, code }),
   });
 }
 
@@ -104,6 +111,14 @@ export function getAuthMe(): Promise<AuthSession> {
 
 export function getDriverStats(): Promise<DriverStats> {
   return request<DriverStats>('/driver/me/stats');
+}
+
+export function getDriverMe(): Promise<Driver> {
+  return request<Driver>('/driver/me');
+}
+
+export function getDriverComplaints(): Promise<{ id: string; message: string; status: string; resolution: string | null; monthYear: string }[]> {
+  return request<{ complaints: { id: string; message: string; status: string; resolution: string | null; monthYear: string }[] }>('/driver/me/complaints').then(r => r.complaints);
 }
 
 export function getDriverRatings(): Promise<DriverRatingView[]> {

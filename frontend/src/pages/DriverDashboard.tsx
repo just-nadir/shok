@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDriverStats, getDriverRatings, logout, ApiError } from '../services/api';
-import type { DriverStats, DriverRatingView } from '../types';
+import { getDriverMe, getDriverComplaints, logout, ApiError } from '../services/api';
+import type { Driver } from '../types';
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  new:      { label: 'Yangi',       className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  reviewed: { label: "Ko'rildi",    className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  resolved: { label: 'Hal qilindi', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
+};
 
 const UZ_MONTHS: Record<string, string> = {
   '01': 'Yanvar', '02': 'Fevral', '03': 'Mart', '04': 'Aprel',
@@ -9,61 +15,30 @@ const UZ_MONTHS: Record<string, string> = {
   '09': 'Sentabr', '10': 'Oktabr', '11': 'Noyabr', '12': 'Dekabr',
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  cleanliness: 'Tozalik',
-  politeness: 'Xushmuomalalik',
-  drivingStyle: 'Haydash Uslubi',
-  punctuality: 'Vaqtida Kelish',
-};
-
-const VALUE_BADGES: Record<string, { label: string; className: string }> = {
-  good: { label: 'Yaxshi', className: 'bg-green-500/20 text-green-400 border border-green-500/30' },
-  average: { label: "O'rtacha", className: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' },
-  bad: { label: 'Yomon', className: 'bg-red-500/20 text-red-400 border border-red-500/30' },
-};
-
-const CATEGORY_KEYS = ['cleanliness', 'politeness', 'drivingStyle', 'punctuality'] as const;
-
-function formatMonthYear(monthYear: string): string {
+function formatMonth(monthYear: string) {
   const [year, month] = monthYear.split('-');
   return `${UZ_MONTHS[month] ?? month} ${year}`;
 }
 
-function Stars({ rating }: { rating: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} className={i <= rating ? 'text-yellow-400' : 'text-gray-600'}>★</span>
-      ))}
-    </div>
-  );
-}
+type Complaint = { id: string; message: string; status: string; resolution: string | null; monthYear: string };
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DriverStats | null>(null);
-  const [ratings, setRatings] = useState<DriverRatingView[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [driver, setDriver] = useState<Driver | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    async function fetchData() {
-      try {
-        const [s, r] = await Promise.all([getDriverStats(), getDriverRatings()]);
-        if (!cancelled) { setStats(s); setRatings(r); }
-      } catch (err) {
+    Promise.all([getDriverMe(), getDriverComplaints()])
+      .then(([me, data]) => { if (!cancelled) { setDriver(me); setComplaints(data); } })
+      .catch(err => {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) {
-          navigate('/driver/login', { replace: true });
-        } else {
-          setError(err instanceof ApiError ? err.message : 'Xatolik yuz berdi');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void fetchData();
+        if (err instanceof ApiError && err.status === 401) navigate('/driver/login', { replace: true });
+        else setError(err instanceof ApiError ? err.message : 'Xatolik yuz berdi');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [navigate]);
 
@@ -71,6 +46,8 @@ export default function DriverDashboard() {
     try { await logout(); } catch { /* ignore */ }
     navigate('/driver/login', { replace: true });
   }, [navigate]);
+
+  const newCount = complaints.filter(c => c.status === 'new').length;
 
   if (loading) {
     return (
@@ -84,107 +61,93 @@ export default function DriverDashboard() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white gap-4">
         <p className="text-red-400">{error}</p>
-        <button
-          onClick={() => navigate('/driver/login', { replace: true })}
-          className="px-6 py-2 bg-yellow-400 text-black font-semibold rounded-xl"
-        >
+        <button onClick={() => navigate('/driver/login', { replace: true })}
+          className="px-6 py-2 bg-yellow-400 text-black font-semibold rounded-xl">
           Qayta kirish
         </button>
       </div>
     );
   }
 
-  const trend = stats?.trend30Days ?? 0;
-  const trendStr = trend >= 0 ? `+${trend.toFixed(1)}` : trend.toFixed(1);
-  const trendColor = trend > 0 ? 'text-green-400' : trend < 0 ? 'text-red-400' : 'text-white/60';
-
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-10">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 bg-gray-900 border-b border-gray-800 gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-9 h-9 shrink-0 rounded-full bg-yellow-400 flex items-center justify-center">
-            <svg className="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+      <div className="flex items-center justify-between px-4 py-4 bg-gray-900 border-b border-gray-800">
+        <div className="flex items-center gap-3 min-w-0">
+          {driver?.avatarUrl ? (
+            <img src={driver.avatarUrl} alt={driver.fullName}
+              className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-700" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0 text-black font-bold text-lg">
+              {driver?.fullName.charAt(0).toUpperCase() ?? '?'}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="font-semibold text-white truncate">{driver?.fullName ?? 'Mening Panelim'}</p>
+            <p className="text-xs text-white/50 truncate">
+              {driver?.carNumber}
+              {driver?.carModel && <span className="ml-1.5">{driver.carModel}</span>}
+              {driver?.carColor && <span className="ml-1.5 text-white/30">{driver.carColor}</span>}
+            </p>
           </div>
-          <span className="font-semibold truncate">Mening Panelim</span>
         </div>
-        <button
-          onClick={() => void handleLogout()}
-          className="shrink-0 text-sm text-white/50 hover:text-white/80 transition-colors min-h-[44px] px-2"
-        >
+        <button onClick={() => void handleLogout()}
+          className="text-sm text-white/50 hover:text-white/80 transition-colors px-2 py-2 shrink-0">
           Chiqish
         </button>
       </div>
 
       <div className="px-4 pt-6 flex flex-col gap-5 max-w-lg mx-auto">
-        {/* Stats card */}
-        {stats && (
-          <div className="bg-gray-900 rounded-2xl p-5">
-            <div className="flex items-start justify-between mb-4 gap-2">
-              <span className="text-white/60 text-sm">Umumiy statistika</span>
-              <span className={`text-sm font-semibold shrink-0 ${trendColor}`}>{trendStr} (30 kun)</span>
-            </div>
-            <div className="flex items-end gap-3 mb-2">
-              <span className="text-5xl font-bold text-yellow-400">{stats.averageRating.toFixed(1)}</span>
-              <span className="text-3xl text-yellow-400 mb-1">★</span>
-            </div>
-            <p className="text-white/50 text-sm">{stats.totalRatings} ta baholash</p>
+        {/* Summary */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-gray-900 rounded-2xl p-4 flex flex-col gap-1">
+            <p className="text-white/50 text-xs">Jami</p>
+            <p className="text-2xl font-bold text-white">{complaints.length}</p>
           </div>
-        )}
-
-        {/* Category averages */}
-        {stats && (
-          <div className="bg-gray-900 rounded-2xl p-5">
-            <p className="text-white/60 text-sm mb-4">Kategoriyalar bo'yicha</p>
-            <div className="grid grid-cols-2 gap-3">
-              {CATEGORY_KEYS.map((key) => (
-                <div key={key} className="bg-gray-800 rounded-xl px-4 py-3">
-                  <p className="text-white/50 text-xs mb-1">{CATEGORY_LABELS[key]}</p>
-                  <p className="text-white font-semibold text-lg">
-                    {stats.categoryAverages[key].toFixed(1)}
-                  </p>
-                </div>
-              ))}
-            </div>
+          <div className="bg-gray-900 rounded-2xl p-4 flex flex-col gap-1">
+            <p className="text-white/50 text-xs">Yangi</p>
+            <p className={`text-2xl font-bold ${newCount > 0 ? 'text-blue-400' : 'text-white'}`}>{newCount}</p>
           </div>
-        )}
+          <div className="bg-gray-900 rounded-2xl p-4 flex flex-col gap-1">
+            <p className="text-white/50 text-xs">Hal qilindi</p>
+            <p className="text-2xl font-bold text-green-400">
+              {complaints.filter(c => c.status === 'resolved').length}
+            </p>
+          </div>
+        </div>
 
-        {/* Ratings list */}
+        {/* Complaints list */}
         <div className="bg-gray-900 rounded-2xl p-5">
-          <p className="text-white/60 text-sm mb-4">So'nggi baholashlar</p>
-          {ratings.length === 0 ? (
-            <p className="text-white/40 text-sm text-center py-4">Hali baholashlar yo'q</p>
+          <p className="text-white/60 text-sm mb-4">Shikoyatlar</p>
+          {complaints.length === 0 ? (
+            <div className="flex flex-col items-center py-8 gap-2 text-white/30">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-sm">Shikoyatlar yo'q</p>
+            </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {ratings.map((r) => (
-                <div key={r.id} className="bg-gray-800 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Stars rating={r.overallRating} />
-                    <span className="text-white/40 text-xs">{formatMonthYear(r.monthYear)}</span>
-                  </div>
-                  {CATEGORY_KEYS.some((k) => r[k]) && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {CATEGORY_KEYS.map((cat) => {
-                        const val = r[cat];
-                        if (!val) return null;
-                        const badge = VALUE_BADGES[val];
-                        if (!badge) return null;
-                        return (
-                          <span key={cat} className={`text-xs px-2 py-0.5 rounded-full ${badge.className}`}>
-                            {CATEGORY_LABELS[cat]}: {badge.label}
-                          </span>
-                        );
-                      })}
+              {complaints.map(c => {
+                const cfg = STATUS_CONFIG[c.status] ?? STATUS_CONFIG['new'];
+                return (
+                  <div key={c.id} className="bg-gray-800 rounded-xl p-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs px-2.5 py-1 rounded-full border ${cfg.className}`}>
+                        {cfg.label}
+                      </span>
+                      <span className="text-white/40 text-xs">{formatMonth(c.monthYear)}</span>
                     </div>
-                  )}
-                  {r.comment && (
-                    <p className="text-white/60 text-sm italic">"{r.comment}"</p>
-                  )}
-                </div>
-              ))}
+                    <p className="text-white/80 text-sm leading-relaxed">{c.message}</p>
+                    {c.resolution && (
+                      <p className="text-xs text-green-400 border-t border-gray-700 pt-2">
+                        Hal qilish usuli: {c.resolution}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
