@@ -1,7 +1,7 @@
 // Service Worker for Shok Taksi PWA
 // Implements: Cache-first strategy (Req 8.3) + Background Sync for offline ratings (Req 8.4)
 
-const CACHE_NAME = 'shok-taksi-v1';
+const CACHE_NAME = 'shok-taksi-v2';
 const SHELL_ASSETS = ['/index.html', '/manifest.json'];
 const SYNC_TAG = 'sync-ratings';
 const IDB_NAME = 'shokTaksiDB';
@@ -42,11 +42,12 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(request)
         .then((response) => {
-          // Only cache successful same-origin responses
+          // Faqat HTML fayllarni cache qilamiz, JS/CSS/assets emas
           if (
             response.ok &&
             response.type === 'basic' &&
-            !url.pathname.startsWith('/api/')
+            !url.pathname.startsWith('/api/') &&
+            (url.pathname === '/' || url.pathname.endsWith('.html'))
           ) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));

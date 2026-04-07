@@ -3,6 +3,10 @@ export interface Driver {
   id: string;
   fullName: string;
   carNumber: string;
+  carModel?: string;
+  carColor?: string;
+  avatarUrl?: string;
+  phone?: string;
   qrCode: string;
   isBlocked: boolean;
 }
@@ -49,4 +53,31 @@ export interface OfflineRating extends RatingRequest {
   localId: string;
   savedAt: number; // timestamp
   synced: boolean;
+}
+
+// Shikoyat
+export interface Complaint {
+  id: string;
+  driverId: string | null;
+  driverName: string | null;
+  carNumber: string | null;
+  phone: string | null;
+  message: string;
+  status: 'new' | 'reviewed' | 'resolved';
+  resolution?: string | null;
+  resolutionNote?: string | null;
+  createdAt: string;
+}
+
+// O'chirilgan shikoyat (arxiv)
+export interface DeletedComplaint {
+  id: string;
+  driverId: string | null;
+  driverName: string | null;
+  carNumber: string | null;
+  phone: string | null;
+  message: string;
+  deletedReason: string;
+  deletedAt: string;
+  createdAt: string;
 }

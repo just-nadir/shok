@@ -52,11 +52,8 @@ export default function OTPVerify() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Redirect if no qr param
-  if (!qrCode) {
-    navigate('/scan', { replace: true });
-    return null;
-  }
+  // Redirect if no qr param — endi scan sahifasi yo'q, qidirish sahifasiga o'tamiz
+  // qrCode bo'lmasa ham ishlaydi
 
   const handlePhoneChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -90,15 +87,19 @@ export default function OTPVerify() {
   }, [phoneDisplay]);
 
   const handleVerifyOtp = useCallback(async () => {
-    if (otp.length !== 6) {
-      setError('6 xonali kodni kiriting');
+    if (otp.length !== 4) {
+      setError('4 xonali kodni kiriting');
       return;
     }
     setLoading(true);
     setError('');
     try {
       await verifyOtp(toE164(phoneDisplay), otp);
-      navigate(`/rate/${encodeURIComponent(qrCode)}?phone=${encodeURIComponent(toE164(phoneDisplay))}`);
+      if (qrCode) {
+        navigate(`/r/${encodeURIComponent(qrCode)}?phone=${encodeURIComponent(toE164(phoneDisplay))}`);
+      } else {
+        navigate(`/search?phone=${encodeURIComponent(toE164(phoneDisplay))}`);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 423 || err.status === 429) {
@@ -195,11 +196,11 @@ export default function OTPVerify() {
               <input
                 type="text"
                 inputMode="numeric"
-                maxLength={6}
-                placeholder="------"
+                maxLength={4}
+                placeholder="----"
                 value={otp}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                   setOtp(val);
                   setError('');
                 }}
@@ -216,7 +217,7 @@ export default function OTPVerify() {
 
             <button
               onClick={() => void handleVerifyOtp()}
-              disabled={loading || otp.length !== 6}
+              disabled={loading || otp.length !== 4}
               className="w-full py-3 bg-yellow-400 text-black font-semibold rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (

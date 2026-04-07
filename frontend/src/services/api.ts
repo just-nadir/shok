@@ -113,7 +113,7 @@ export function getDriverRatings(): Promise<DriverRatingView[]> {
 // --- Admin endpoints ---
 
 export function getAdminDrivers(): Promise<Driver[]> {
-  return request<Driver[]>('/admin/drivers');
+  return request<{ drivers: Driver[] }>('/admin/drivers').then((r) => r.drivers);
 }
 
 export function getAdminDriverRatings(driverId: string): Promise<DriverRatingView[]> {
@@ -125,7 +125,7 @@ export function getAdminRatings(from?: string, to?: string): Promise<DriverRatin
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   const query = params.toString();
-  return request<DriverRatingView[]>(`/admin/ratings${query ? `?${query}` : ''}`);
+  return request<{ ratings: DriverRatingView[] }>(`/admin/ratings${query ? `?${query}` : ''}`).then((r) => r.ratings);
 }
 
 export async function exportAdminRatings(): Promise<Blob> {
@@ -145,9 +145,50 @@ export async function exportAdminRatings(): Promise<Blob> {
   return res.blob();
 }
 
+export async function uploadAvatar(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${BASE_URL}/upload/avatar`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new ApiError(res.status, body.error ?? 'Yuklash xatosi');
+  }
+  const data = await res.json() as { url: string };
+  // proxy orqali ishlaydi, to'g'ridan-to'g'ri relative URL
+  return data.url;
+}
+
+export function deleteDriver(driverId: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/admin/drivers/${encodeURIComponent(driverId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export function blockDriver(driverId: string): Promise<{ message: string }> {
   return request<{ message: string }>(`/admin/drivers/${encodeURIComponent(driverId)}/block`, {
     method: 'POST',
+  });
+}
+
+export function createDriver(data: {
+  fullName: string; carNumber: string; carModel?: string; carColor?: string; avatarUrl?: string; phone?: string; password: string;
+}): Promise<{ id: string; qrCode: string }> {
+  return request<{ id: string; qrCode: string }>('/admin/drivers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateDriver(driverId: string, data: {
+  fullName?: string; carNumber?: string; carModel?: string; carColor?: string; avatarUrl?: string; phone?: string;
+}): Promise<{ message: string }> {
+  return request<{ message: string }>(`/admin/drivers/${encodeURIComponent(driverId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   });
 }
 
@@ -155,4 +196,34 @@ export function getDriverQr(driverId: string): Promise<{ qrCode: string; qrImage
   return request<{ qrCode: string; qrImageUrl: string }>(
     `/admin/qr/${encodeURIComponent(driverId)}`
   );
+}
+
+// --- Complaints ---
+import type { Complaint, DeletedComplaint } from '../types';
+
+export function getComplaints(status?: string, from?: string, to?: string): Promise<Complaint[]> {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const q = params.toString();
+  return request<{ complaints: Complaint[] }>(`/complaints${q ? `?${q}` : ''}`).then(r => r.complaints);
+}
+
+export function updateComplaintStatus(id: string, status: string, resolution?: string, resolutionNote?: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/complaints/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, resolution, resolutionNote }),
+  });
+}
+
+export function deleteComplaint(id: string, reason: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/complaints/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function getDeletedComplaints(): Promise<DeletedComplaint[]> {
+  return request<{ complaints: DeletedComplaint[] }>('/complaints/deleted').then(r => r.complaints);
 }

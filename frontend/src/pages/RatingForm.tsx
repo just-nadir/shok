@@ -143,9 +143,27 @@ export default function RatingForm() {
         {!loadingDriver && driver && !success && !offlineSaved && (
           <>
             {/* Driver info */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-              <p className="font-semibold text-gray-900">{driver.fullName}</p>
-              <p className="text-sm text-gray-500 mt-0.5">{driver.carNumber}</p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-center gap-4">
+              {driver.avatarUrl ? (
+                <img src={driver.avatarUrl} alt={driver.fullName}
+                  className="w-14 h-14 rounded-full object-cover shrink-0 border-2 border-yellow-300" />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-yellow-300 flex items-center justify-center shrink-0 text-yellow-900 font-bold text-2xl">
+                  {driver.fullName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900 text-base">{driver.fullName}</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                  <span className="text-sm text-gray-500 font-mono">{driver.carNumber}</span>
+                  {driver.carModel && (
+                    <span className="text-sm text-gray-400">{driver.carModel}</span>
+                  )}
+                  {driver.carColor && (
+                    <span className="text-sm text-gray-400">{driver.carColor}</span>
+                  )}
+                </div>
+              </div>
             </div>
 
             <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-5">

@@ -26,6 +26,10 @@ router.get('/drivers', requireAdmin, async (_req: Request, res: Response): Promi
     id: string;
     full_name: string;
     car_number: string;
+    car_model: string | null;
+    car_color: string | null;
+    avatar_url: string | null;
+    phone: string | null;
     qr_code: string;
     is_blocked: boolean;
     average_rating: string;
@@ -35,6 +39,10 @@ router.get('/drivers', requireAdmin, async (_req: Request, res: Response): Promi
        d.id,
        d.full_name,
        d.car_number,
+       d.car_model,
+       d.car_color,
+       d.avatar_url,
+       d.phone,
        d.qr_code,
        d.is_blocked,
        ROUND(AVG(r.overall_rating)::numeric, 2) AS average_rating,
@@ -49,6 +57,10 @@ router.get('/drivers', requireAdmin, async (_req: Request, res: Response): Promi
     id: d.id,
     fullName: d.full_name,
     carNumber: d.car_number,
+    carModel: d.car_model ?? undefined,
+    carColor: d.car_color ?? undefined,
+    avatarUrl: d.avatar_url ?? undefined,
+    phone: d.phone ?? undefined,
     qrCode: d.qr_code,
     isBlocked: d.is_blocked,
     averageRating: d.average_rating ? parseFloat(d.average_rating) : null,
@@ -210,6 +222,71 @@ router.get('/ratings/export', requireAdmin, async (req: Request, res: Response):
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="ratings.csv"');
   res.status(200).send(csv);
+});
+
+// POST /api/admin/drivers — yangi haydovchi qo'shish
+router.post('/drivers', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { fullName, carNumber, carModel, carColor, avatarUrl, phone, password } = req.body as {
+    fullName?: string; carNumber?: string; carModel?: string; carColor?: string; avatarUrl?: string; phone?: string; password?: string;
+  };
+
+  if (!fullName || !carNumber || !password) {
+    res.status(400).json({ error: 'fullName, carNumber va password kerak', code: 'MISSING_FIELDS' });
+    return;
+  }
+
+  const bcrypt = await import('bcrypt');
+  const passwordHash = await bcrypt.hash(password, 10);
+  const qrCode = crypto.randomBytes(32).toString('hex');
+
+  const result = await query<{ id: string }>(
+    `INSERT INTO drivers (full_name, car_number, car_model, car_color, avatar_url, phone, qr_code, password_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [fullName, carNumber, carModel ?? null, carColor ?? null, avatarUrl ?? null, phone ?? null, qrCode, passwordHash]
+  );
+
+  res.status(201).json({ id: result.rows[0].id, qrCode });
+});
+
+// PATCH /api/admin/drivers/:id — haydovchini tahrirlash
+router.patch('/drivers/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { fullName, carNumber, carModel, carColor, avatarUrl, phone } = req.body as {
+    fullName?: string; carNumber?: string; carModel?: string; carColor?: string; avatarUrl?: string; phone?: string;
+  };
+
+  const result = await query<{ id: string }>(
+    `UPDATE drivers SET
+       full_name   = COALESCE($1, full_name),
+       car_number  = COALESCE($2, car_number),
+       car_model   = COALESCE($3, car_model),
+       car_color   = COALESCE($4, car_color),
+       avatar_url  = COALESCE($5, avatar_url),
+       phone       = COALESCE($6, phone)
+     WHERE id = $7 RETURNING id`,
+    [fullName ?? null, carNumber ?? null, carModel ?? null, carColor ?? null, avatarUrl ?? null, phone ?? null, id]
+  );
+
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Haydovchi topilmadi', code: 'DRIVER_NOT_FOUND' });
+    return;
+  }
+
+  res.status(200).json({ message: 'Yangilandi' });
+});
+
+// DELETE /api/admin/drivers/:id
+router.delete('/drivers/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const result = await query<{ id: string }>(
+    `DELETE FROM drivers WHERE id = $1 RETURNING id`,
+    [id]
+  );
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Haydovchi topilmadi', code: 'DRIVER_NOT_FOUND' });
+    return;
+  }
+  res.status(200).json({ message: "Haydovchi o'chirildi" });
 });
 
 // POST /api/admin/drivers/:id/block

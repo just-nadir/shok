@@ -144,6 +144,48 @@ router.get('/me', (req: Request, res: Response): void => {
   res.status(200).json({ role: req.session.role, userId: req.session.userId });
 });
 
+// POST /api/auth/admin/login
+router.post('/admin/login', async (req: Request, res: Response): Promise<void> => {
+  const { username, password } = req.body as { username?: string; password?: string };
+
+  if (!username || !password) {
+    res.status(400).json({ error: 'Login va parol kerak', code: 'MISSING_FIELDS' });
+    return;
+  }
+
+  const blocked = await isBlocked(username);
+  if (blocked) {
+    res.status(423).json({ error: "Juda ko'p urinish. 15 daqiqadan so'ng urinib ko'ring", code: 'RATE_LIMITED' });
+    return;
+  }
+
+  const result = await query<{ id: string; username: string; password_hash: string }>(
+    `SELECT id, username, password_hash FROM admins WHERE username = $1 LIMIT 1`,
+    [username]
+  );
+
+  if (result.rows.length === 0) {
+    await recordAttempt(username);
+    res.status(401).json({ error: "Login yoki parol noto'g'ri", code: 'INVALID_CREDENTIALS' });
+    return;
+  }
+
+  const admin = result.rows[0];
+  const passwordValid = await bcrypt.compare(password, admin.password_hash);
+
+  if (!passwordValid) {
+    await recordAttempt(username);
+    res.status(401).json({ error: "Login yoki parol noto'g'ri", code: 'INVALID_CREDENTIALS' });
+    return;
+  }
+
+  await clearAttempts(username);
+  req.session.userId = admin.id;
+  req.session.role = 'admin';
+
+  res.status(200).json({ message: 'Kirish muvaffaqiyatli', admin: { id: admin.id, username: admin.username } });
+});
+
 // POST /api/auth/logout
 router.post('/logout', (req: Request, res: Response): void => {
   req.session.destroy((err) => {
