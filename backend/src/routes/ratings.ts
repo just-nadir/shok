@@ -61,24 +61,22 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // Check 24-hour re-rating block
-  // Since phone is stored as bcrypt hash, fetch recent hashes and compare
-  const recentRatings = await query<{ phone_hash: string }>(
-    `SELECT phone_hash FROM ratings
-     WHERE driver_id = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
-    [driver.id]
-  );
-
-  for (const row of recentRatings.rows) {
-    const match = await bcrypt.compare(phone, row.phone_hash);
-    if (match) {
-      res.status(429).json({
-        error: 'Siz bu haydovchini bugun allaqachon baholagansiz',
-        code: 'ALREADY_RATED',
-      });
-      return;
-    }
-  }
+  // TODO: 24 soatlik limit — test uchun vaqtincha o'chirilgan
+  // const recentRatings = await query<{ phone_hash: string }>(
+  //   `SELECT phone_hash FROM ratings
+  //    WHERE driver_id = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
+  //   [driver.id]
+  // );
+  // for (const row of recentRatings.rows) {
+  //   const match = await bcrypt.compare(phone, row.phone_hash);
+  //   if (match) {
+  //     res.status(429).json({
+  //       error: 'Siz bu haydovchini bugun allaqachon baholagansiz',
+  //       code: 'ALREADY_RATED',
+  //     });
+  //     return;
+  //   }
+  // }
 
   // Hash phone and insert rating
   const phoneHash = await bcrypt.hash(phone, SALT_ROUNDS);

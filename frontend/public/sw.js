@@ -1,7 +1,7 @@
 // Service Worker for Shok Taksi PWA
 // Implements: Cache-first strategy (Req 8.3) + Background Sync for offline ratings (Req 8.4)
 
-const CACHE_NAME = 'shok-taksi-v1';
+const CACHE_NAME = 'shok-taksi-v3';
 const SHELL_ASSETS = ['/index.html', '/manifest.json'];
 const SYNC_TAG = 'sync-ratings';
 const IDB_NAME = 'shokTaksiDB';
@@ -26,35 +26,37 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// ── Fetch: cache-first for static assets, network-first for API ───────────────
+// ── Fetch: network-first for JS/CSS, cache-first for shell ───────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET and API requests — let them go straight to network
+  // Skip non-GET and API requests
   if (request.method !== 'GET' || url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // JS/CSS/assets — always network first so updates apply immediately
+  const isAsset = /\.(js|ts|jsx|tsx|css|map)(\?.*)?$/.test(url.pathname);
+  if (isAsset) {
+    event.respondWith(
+      fetch(request).catch(() => caches.match(request))
+    );
     return;
   }
 
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
-
       return fetch(request)
         .then((response) => {
-          // Only cache successful same-origin responses
-          if (
-            response.ok &&
-            response.type === 'basic' &&
-            !url.pathname.startsWith('/api/')
-          ) {
+          if (response.ok && response.type === 'basic') {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
         })
         .catch(() => {
-          // For navigation requests fall back to the cached shell
           if (request.mode === 'navigate') {
             return caches.match('/index.html');
           }

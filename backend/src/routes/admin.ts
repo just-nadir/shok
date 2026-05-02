@@ -19,6 +19,42 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
+// POST /api/admin/drivers — yangi haydovchi yaratish
+router.post('/drivers', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { fullName, carNumber, phone, password } = req.body as {
+    fullName?: string;
+    carNumber?: string;
+    phone?: string;
+    password?: string;
+  };
+
+  if (!fullName?.trim() || !carNumber?.trim() || !password?.trim()) {
+    res.status(400).json({ error: 'Ism, avtomobil raqami va parol kerak', code: 'MISSING_FIELDS' });
+    return;
+  }
+
+  const qrCode = crypto.randomBytes(16).toString('hex');
+  const bcrypt = await import('bcrypt');
+  const passwordHash = await bcrypt.default.hash(password, 10);
+
+  try {
+    const result = await query<{ id: string }>(
+      `INSERT INTO drivers (full_name, car_number, qr_code, password_hash, phone)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [fullName.trim(), carNumber.trim().toUpperCase(), qrCode, passwordHash, phone?.trim() || null]
+    );
+    res.status(201).json({ message: 'Haydovchi yaratildi', id: result.rows[0].id });
+  } catch (err: unknown) {
+    const pg = err as { code?: string };
+    if (pg.code === '23505') {
+      res.status(409).json({ error: 'Bu avtomobil raqami yoki telefon allaqachon mavjud', code: 'DUPLICATE' });
+    } else {
+      throw err;
+    }
+  }
+});
+
 // GET /api/admin/drivers
 // Requirements: 7.2
 router.get('/drivers', requireAdmin, async (_req: Request, res: Response): Promise<void> => {

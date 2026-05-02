@@ -7,6 +7,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 const QRScanner = React.lazy(() => import('./pages/QRScanner'));
 const OTPVerify = React.lazy(() => import('./pages/OTPVerify'));
 const RatingForm = React.lazy(() => import('./pages/RatingForm'));
+const CustomerLogin = React.lazy(() => import('./pages/CustomerLogin'));
+const CarNumberSearch = React.lazy(() => import('./pages/CarNumberSearch'));
 const DriverLogin = React.lazy(() => import('./pages/DriverLogin'));
 const DriverDashboard = React.lazy(() => import('./pages/DriverDashboard'));
 const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
@@ -22,6 +24,8 @@ export default function App() {
           <Route path="/scan" element={<QRScanner />} />
           <Route path="/otp" element={<OTPVerify />} />
           <Route path="/rate/:qrCode" element={<RatingForm />} />
+          <Route path="/customer/login" element={<CustomerLogin />} />
+          <Route path="/customer/search" element={<CarNumberSearch />} />
           <Route path="/driver/login" element={<DriverLogin />} />
           <Route
             path="/driver/dashboard"
@@ -40,7 +44,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/scan" replace />} />
+          <Route path="/" element={<Navigate to="/customer/login" replace />} />
         </Routes>
       </Suspense>
       </ErrorBoundary>

@@ -52,6 +52,14 @@ export function getDriverByQrCode(qrCode: string): Promise<Driver> {
   return request<Driver>(`/driver/${encodeURIComponent(qrCode)}`);
 }
 
+export function getDriverByCarNumber(carNumber: string): Promise<Driver> {
+  return request<Driver>(`/driver/car/${encodeURIComponent(carNumber)}`);
+}
+
+export function getDriverByPhone(phone: string): Promise<Driver> {
+  return request<Driver>(`/driver/phone/${encodeURIComponent(phone)}`);
+}
+
 export function submitRating(data: RatingRequest): Promise<{ message: string }> {
   return request<{ message: string }>('/ratings', {
     method: 'POST',
@@ -113,19 +121,26 @@ export function getDriverRatings(): Promise<DriverRatingView[]> {
 // --- Admin endpoints ---
 
 export function getAdminDrivers(): Promise<Driver[]> {
-  return request<Driver[]>('/admin/drivers');
+  return request<{ drivers: Driver[] }>('/admin/drivers').then((r) => r.drivers);
+}
+
+export function createDriver(data: { fullName: string; carNumber: string; phone?: string; password: string }): Promise<{ message: string; id: string }> {
+  return request<{ message: string; id: string }>('/admin/drivers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function getAdminDriverRatings(driverId: string): Promise<DriverRatingView[]> {
   return request<DriverRatingView[]>(`/admin/drivers/${encodeURIComponent(driverId)}/ratings`);
 }
 
-export function getAdminRatings(from?: string, to?: string): Promise<DriverRatingView[]> {
+export function getAdminRatings(from?: string, to?: string): Promise<(DriverRatingView & { driverName?: string; carNumber?: string; createdAt?: string })[]> {
   const params = new URLSearchParams();
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   const query = params.toString();
-  return request<DriverRatingView[]>(`/admin/ratings${query ? `?${query}` : ''}`);
+  return request<{ ratings: (DriverRatingView & { driverName?: string; carNumber?: string; createdAt?: string })[] }>(`/admin/ratings${query ? `?${query}` : ''}`).then((r) => r.ratings);
 }
 
 export async function exportAdminRatings(): Promise<Blob> {
@@ -145,9 +160,10 @@ export async function exportAdminRatings(): Promise<Blob> {
   return res.blob();
 }
 
-export function blockDriver(driverId: string): Promise<{ message: string }> {
+export function blockDriver(driverId: string, block = true): Promise<{ message: string }> {
   return request<{ message: string }>(`/admin/drivers/${encodeURIComponent(driverId)}/block`, {
     method: 'POST',
+    body: JSON.stringify({ block }),
   });
 }
 
