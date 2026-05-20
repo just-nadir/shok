@@ -7,9 +7,16 @@ declare global {
   interface Window {
     Telegram?: {
       Login?: {
-        init: (options: { client_id: number; request_access?: string[]; lang?: string }, callback: (data: { id_token?: string; error?: string }) => void) => void;
-        open: (callback?: (data: { id_token?: string; error?: string }) => void) => void;
         auth: (options: { client_id: number; request_access?: string[]; lang?: string }, callback: (data: { id_token?: string; error?: string }) => void) => void;
+      };
+      WebApp?: {
+        initData: string;
+        initDataUnsafe: {
+          user?: { id: number; first_name: string; last_name?: string; username?: string };
+        };
+        ready: () => void;
+        close: () => void;
+        platform: string;
       };
     };
   }
@@ -20,15 +27,40 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Telegram Login SDK yuklash
+  // Mini App ichida bo'lsa — avtomatik auth
   useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (tg && tg.initData) {
+      tg.ready();
+      setLoading(true);
+      fetch('/api/auth/telegram-webapp', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({})) as { error?: string };
+            throw new Error(body.error || 'Kirish xatosi');
+          }
+          navigate('/customer/search', { replace: true });
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : 'Xatolik');
+          setLoading(false);
+        });
+      return;
+    }
+
+    // Brauzer uchun Telegram Login SDK yuklash
     if (document.getElementById('telegram-login-sdk')) return;
     const script = document.createElement('script');
     script.id = 'telegram-login-sdk';
     script.src = 'https://telegram.org/js/telegram-login.js';
     script.async = true;
     document.head.appendChild(script);
-  }, []);
+  }, [navigate]);
 
   const handleTelegramAuth = useCallback(async (data: { id_token?: string; error?: string }) => {
     if (data.error || !data.id_token) {
@@ -53,7 +85,6 @@ export default function CustomerLogin() {
         throw new Error(body.error || 'Kirish xatosi');
       }
 
-      // Muvaffaqiyatli — qidirish sahifasiga o'tish
       navigate('/customer/search', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Xatolik yuz berdi');
@@ -79,10 +110,18 @@ export default function CustomerLogin() {
     );
   }, [handleTelegramAuth]);
 
+  // Mini App ichida loading ko'rsatish
+  if (window.Telegram?.WebApp?.initData && loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <span className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm flex flex-col items-center gap-6">
-        {/* Logo */}
         <div className="flex flex-col items-center gap-3">
           <div className="w-16 h-16 rounded-full bg-yellow-400 flex items-center justify-center">
             <svg className="w-9 h-9 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,7 +135,6 @@ export default function CustomerLogin() {
           <p className="text-white/50 text-sm text-center">Haydovchini baholash uchun Telegram orqali kiring</p>
         </div>
 
-        {/* Telegram Login Button */}
         <button
           onClick={handleLogin}
           disabled={loading}
@@ -112,9 +150,7 @@ export default function CustomerLogin() {
           Telegram orqali kirish
         </button>
 
-        {error && (
-          <p className="text-red-400 text-sm text-center">{error}</p>
-        )}
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
         <p className="text-white/30 text-xs text-center">
           Telegram akkauntingiz orqali xavfsiz kirish. Telefon raqamingiz maxfiy saqlanadi.

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { isBlocked, recordAttempt, clearAttempts } from '../middleware/rateLimiter';
 import { query } from '../db/pool';
 import { verifyTelegramIdToken } from '../services/telegramAuth';
@@ -8,6 +9,68 @@ import { verifyTelegramIdToken } from '../services/telegramAuth';
 import '../types/index';
 
 const router = Router();
+
+// --- Mini App initData verification ---
+function verifyTelegramWebAppData(initData: string, botToken: string): { valid: boolean; user?: { id: number; first_name: string; last_name?: string; username?: string } } {
+  const params = new URLSearchParams(initData);
+  const hash = params.get('hash');
+  if (!hash) return { valid: false };
+
+  params.delete('hash');
+  const dataCheckArr = Array.from(params.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, val]) => `${key}=${val}`);
+  const dataCheckString = dataCheckArr.join('\n');
+
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  if (computedHash !== hash) return { valid: false };
+
+  const userStr = params.get('user');
+  if (!userStr) return { valid: false };
+
+  try {
+    const user = JSON.parse(userStr) as { id: number; first_name: string; last_name?: string; username?: string };
+    return { valid: true, user };
+  } catch {
+    return { valid: false };
+  }
+}
+
+// POST /api/auth/telegram-webapp — Mini App orqali avtomatik kirish
+router.post('/telegram-webapp', async (req: Request, res: Response): Promise<void> => {
+  const { initData } = req.body as { initData?: string };
+
+  if (!initData) {
+    res.status(400).json({ error: 'initData kerak', code: 'MISSING_INIT_DATA' });
+    return;
+  }
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    res.status(500).json({ error: 'Server konfiguratsiya xatosi', code: 'CONFIG_ERROR' });
+    return;
+  }
+
+  const result = verifyTelegramWebAppData(initData, botToken);
+  if (!result.valid || !result.user) {
+    res.status(401).json({ error: 'initData yaroqsiz', code: 'INVALID_INIT_DATA' });
+    return;
+  }
+
+  req.session.userId = String(result.user.id);
+  req.session.role = 'customer';
+  req.session.telegramId = result.user.id;
+
+  res.status(200).json({
+    message: 'Kirish muvaffaqiyatli',
+    user: {
+      id: result.user.id,
+      name: [result.user.first_name, result.user.last_name].filter(Boolean).join(' '),
+    },
+  });
+});
 
 // POST /api/auth/telegram — Telegram Login orqali kirish
 router.post('/telegram', async (req: Request, res: Response): Promise<void> => {
