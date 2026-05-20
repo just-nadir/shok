@@ -1,50 +1,50 @@
 import bcrypt from 'bcrypt';
 import { query } from '../db/pool';
 
-// --- Eskiz.uz token cache ---
-let eskizToken: string | null = null;
-let eskizTokenExpiry: number = 0;
+// --- TextUp.uz token cache ---
+let textupToken: string | null = null;
+let textupTokenExpiry: number = 0;
 
 /** Reset token cache — for testing only */
 export function _resetTokenCache(): void {
-  eskizToken = null;
-  eskizTokenExpiry = 0;
+  textupToken = null;
+  textupTokenExpiry = 0;
 }
 
-async function getEskizToken(): Promise<string> {
-  if (eskizToken && Date.now() < eskizTokenExpiry) {
-    return eskizToken;
+async function getTextUpToken(): Promise<string> {
+  if (textupToken && Date.now() < textupTokenExpiry) {
+    return textupToken;
   }
 
-  const email = process.env.ESKIZ_EMAIL;
-  const password = process.env.ESKIZ_PASSWORD;
+  const email = process.env.TEXTUP_EMAIL;
+  const password = process.env.TEXTUP_PASSWORD;
 
   if (!email || !password) {
-    throw new Error('ESKIZ_EMAIL va ESKIZ_PASSWORD muhit o\'zgaruvchilari kerak');
+    throw new Error('TEXTUP_EMAIL va TEXTUP_PASSWORD muhit o\'zgaruvchilari kerak');
   }
 
-  const res = await fetch('https://notify.eskiz.uz/api/auth/login', {
+  const res = await fetch('https://api-auth.textup.uz/v1/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
 
   if (!res.ok) {
-    throw new Error(`Eskiz.uz login xatosi: ${res.status}`);
+    throw new Error(`TextUp.uz login xatosi: ${res.status}`);
   }
 
-  const data = (await res.json()) as { data?: { token?: string } };
-  const token = data?.data?.token;
+  const data = (await res.json()) as { accessToken?: string };
+  const token = data?.accessToken;
 
   if (!token) {
-    throw new Error('Eskiz.uz tokenini olishda xato');
+    throw new Error('TextUp.uz tokenini olishda xato');
   }
 
-  eskizToken = token;
-  // Token 29 daqiqa amal qiladi (30 daqiqadan biroz kam)
-  eskizTokenExpiry = Date.now() + 29 * 60 * 1000;
+  textupToken = token;
+  // Token 25 daqiqa amal qiladi (xavfsizlik uchun erta yangilaymiz)
+  textupTokenExpiry = Date.now() + 25 * 60 * 1000;
 
-  return eskizToken;
+  return textupToken;
 }
 
 // --- OTP generatsiya ---
@@ -67,42 +67,47 @@ export async function sendOTP(phone: string): Promise<void> {
     [phone, codeHash, expiresAt]
   );
 
-  const token = await getEskizToken();
-  const sender = process.env.ESKIZ_SENDER || '4546';
+  const token = await getTextUpToken();
+  const userId = process.env.TEXTUP_USER_ID;
+
+  if (!userId) {
+    throw new Error('TEXTUP_USER_ID muhit o\'zgaruvchisi kerak');
+  }
+
   const message = `Shok Taksi: tasdiqlash kodi ${code}. 5 daqiqa ichida amal qiladi.`;
 
-  const smsRes = await fetch('https://notify.eskiz.uz/api/message/sms/send', {
+  const smsRes = await fetch('https://sms-api.textup.uz/v1/send', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      mobile_phone: phone,
       message,
-      from: sender,
-      callback_url: '',
+      userId,
+      recipients: [phone],
+      name: `OTP-${phone}`,
     }),
   });
 
   if (!smsRes.ok) {
     // Token muddati o'tgan bo'lishi mumkin — bir marta qayta urinib ko'ramiz
     if (smsRes.status === 401) {
-      eskizToken = null;
-      eskizTokenExpiry = 0;
-      const freshToken = await getEskizToken();
+      textupToken = null;
+      textupTokenExpiry = 0;
+      const freshToken = await getTextUpToken();
 
-      const retryRes = await fetch('https://notify.eskiz.uz/api/message/sms/send', {
+      const retryRes = await fetch('https://sms-api.textup.uz/v1/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${freshToken}`,
         },
         body: JSON.stringify({
-          mobile_phone: phone,
           message,
-          from: sender,
-          callback_url: '',
+          userId,
+          recipients: [phone],
+          name: `OTP-${phone}`,
         }),
       });
 

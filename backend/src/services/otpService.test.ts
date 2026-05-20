@@ -15,31 +15,32 @@ import { sendOTP, verifyOTP, _resetTokenCache } from './otpService';
 
 const mockQuery = query as ReturnType<typeof vi.fn>;
 
-// Helper: reset eskiz token cache between tests by resetting module-level state
+// Helper: reset textup token cache between tests by resetting module-level state
 // We do this by resetting fetch mock and clearing query mock
 beforeEach(() => {
   vi.clearAllMocks();
   // Reset token cache so each test starts fresh (login fetch will be called)
   _resetTokenCache();
-  // Set required env vars so getEskizToken() doesn't throw before fetch
-  process.env.ESKIZ_EMAIL = 'test@example.com';
-  process.env.ESKIZ_PASSWORD = 'test-password';
+  // Set required env vars so getTextUpToken() doesn't throw before fetch
+  process.env.TEXTUP_EMAIL = 'test@example.com';
+  process.env.TEXTUP_PASSWORD = 'test-password';
+  process.env.TEXTUP_USER_ID = 'test-user-uuid';
   // Reset global fetch mock
   vi.stubGlobal('fetch', vi.fn());
 });
 
-// Helper: setup fetch mock for Eskiz.uz (login + SMS send)
-function mockEskizFetch() {
+// Helper: setup fetch mock for TextUp.uz (login + SMS send)
+function mockTextUpFetch() {
   const fetchMock = vi.fn();
   // First call: auth/login
   fetchMock.mockResolvedValueOnce({
     ok: true,
-    json: async () => ({ data: { token: 'test-token-123' } }),
+    json: async () => ({ accessToken: 'test-token-123' }),
   });
   // Second call: sms/send
   fetchMock.mockResolvedValueOnce({
     ok: true,
-    json: async () => ({ status: 'waiting' }),
+    json: async () => ({ smsId: 'sms-id-123' }),
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -56,7 +57,7 @@ describe('Property 8: OTP round-trip', () => {
 
           // Reset eskiz token cache by re-importing won't work easily,
           // so we mock fetch fresh each iteration
-          mockEskizFetch();
+          mockTextUpFetch();
 
           let capturedHash: string | null = null;
           let capturedId = 'otp-id-1';
@@ -94,7 +95,7 @@ describe('Property 8: OTP round-trip', () => {
           // Reset and use a controlled code
           vi.clearAllMocks();
           _resetTokenCache();
-          mockEskizFetch();
+          mockTextUpFetch();
 
           const controlledCode = '123456';
           const controlledHash = await bcrypt.hash(controlledCode, 1);
@@ -132,7 +133,7 @@ describe('Property 8: OTP round-trip', () => {
         async (phone: string, wrongCode: string) => {
           vi.clearAllMocks();
           _resetTokenCache();
-          mockEskizFetch();
+          mockTextUpFetch();
 
           const correctCode = '999999';
           const correctHash = await bcrypt.hash(correctCode, 1);
@@ -172,7 +173,7 @@ describe('Property 8: OTP round-trip', () => {
         async (phone: string) => {
           vi.clearAllMocks();
           _resetTokenCache();
-          mockEskizFetch();
+          mockTextUpFetch();
 
           mockQuery.mockImplementation(async (sql: string) => {
             if (sql.includes('INSERT INTO otp_codes')) {
@@ -201,7 +202,7 @@ describe('Property 8: OTP round-trip', () => {
         async (phone: string) => {
           vi.clearAllMocks();
           _resetTokenCache();
-          mockEskizFetch();
+          mockTextUpFetch();
 
           const code = '654321';
           const hash = await bcrypt.hash(code, 1);
