@@ -13,6 +13,9 @@ backend/.env.production
 logs/
 *.log
 
+# Uploads (user content)
+backend/uploads/
+
 # OS
 .DS_Store
 Thumbs.db
