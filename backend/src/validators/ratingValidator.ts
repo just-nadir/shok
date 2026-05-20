@@ -52,9 +52,9 @@ export function validateRatingRequest(req: unknown): ValidationResult {
 
   const body = req as Record<string, unknown>;
 
-  // driverQrCode tekshiruvi
-  if (!body.driverQrCode || typeof body.driverQrCode !== 'string' || body.driverQrCode.trim() === '') {
-    errors.push("driverQrCode majburiy va satr bo'lishi kerak");
+  // driverId tekshiruvi
+  if (!body.driverId || typeof body.driverId !== 'string' || body.driverId.trim() === '') {
+    errors.push("driverId majburiy va satr bo'lishi kerak");
   }
 
   // phone tekshiruvi

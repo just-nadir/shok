@@ -21,7 +21,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   const {
-    driverQrCode,
+    driverId,
     phone,
     overallRating,
     cleanliness,
@@ -30,7 +30,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     punctuality,
     comment,
   } = req.body as {
-    driverQrCode: string;
+    driverId: string;
     phone: string;
     overallRating: number;
     cleanliness?: string;
@@ -40,17 +40,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     comment?: string;
   };
 
-  // Look up driver by QR code
-  const driverResult = await query<{
-    id: string;
-    is_blocked: boolean;
-  }>(
-    `SELECT id, is_blocked FROM drivers WHERE qr_code = $1 LIMIT 1`,
-    [driverQrCode]
+  // Look up driver by ID
+  const driverResult = await query<{ id: string; is_blocked: boolean }>(
+    `SELECT id, is_blocked FROM drivers WHERE id = $1 LIMIT 1`,
+    [driverId]
   );
 
   if (driverResult.rows.length === 0) {
-    res.status(404).json({ error: 'QR kod yaroqsiz yoki topilmadi', code: 'DRIVER_NOT_FOUND' });
+    res.status(404).json({ error: 'Haydovchi topilmadi', code: 'DRIVER_NOT_FOUND' });
     return;
   }
 

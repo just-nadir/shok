@@ -1,40 +1,46 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { driverLogin, ApiError } from '../services/api';
+import { driverSendOtp, driverVerifyOtp, ApiError } from '../services/api';
+
+type Step = 'phone' | 'otp';
 
 export default function DriverLogin() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [step, setStep] = useState<Step>('phone');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = useCallback(async () => {
-    if (!username.trim() || !password.trim()) {
-      setError("Login va parolni kiriting");
-      return;
-    }
-    setLoading(true);
-    setError('');
+  const handleSend = useCallback(async () => {
+    if (!phone.trim()) { setError("Telefon raqamini kiriting"); return; }
+    setLoading(true); setError('');
     try {
-      await driverLogin(username.trim(), password);
+      await driverSendOtp(phone.trim());
+      setStep('otp');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 404) setError("Bu telefon raqam tizimda topilmadi");
+        else if (err.status === 423) setError("Juda ko'p urinish. 15 daqiqadan so'ng urinib ko'ring");
+        else setError(err.message || 'Xatolik yuz berdi');
+      } else setError('Xatolik yuz berdi');
+    } finally { setLoading(false); }
+  }, [phone]);
+
+  const handleVerify = useCallback(async () => {
+    if (otp.length !== 4) { setError("4 xonali kodni kiriting"); return; }
+    setLoading(true); setError('');
+    try {
+      await driverVerifyOtp(phone.trim(), otp);
       navigate('/driver/dashboard', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 401 || err.status === 403) {
-          setError("Login yoki parol noto'g'ri");
-        } else if (err.status === 423 || err.status === 429) {
-          setError("Juda ko'p urinish. 15 daqiqadan so'ng urinib ko'ring");
-        } else {
-          setError(err.message || 'Xatolik yuz berdi');
-        }
-      } else {
-        setError('Xatolik yuz berdi');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [username, password, navigate]);
+        if (err.status === 401) setError("Kod noto'g'ri yoki muddati o'tgan");
+        else if (err.status === 423) setError("Juda ko'p urinish. 15 daqiqadan so'ng urinib ko'ring");
+        else setError(err.message || 'Xatolik yuz berdi');
+      } else setError('Xatolik yuz berdi');
+    } finally { setLoading(false); }
+  }, [phone, otp, navigate]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white px-4">
@@ -47,52 +53,65 @@ export default function DriverLogin() {
             </svg>
           </div>
           <h1 className="text-xl font-bold text-white">Haydovchi Paneli</h1>
-          <p className="text-sm text-white/60 mt-1">Hisobingizga kiring</p>
+          <p className="text-sm text-white/60 mt-1">
+            {step === 'phone' ? 'Telefon raqamingizni kiriting' : 'SMS kodni kiriting'}
+          </p>
         </div>
 
         <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm text-white/70 mb-1">Login</label>
-            <input
-              type="text"
-              placeholder="Loginni kiriting"
-              value={username}
-              onChange={(e) => { setUsername(e.target.value); setError(''); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit(); }}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-yellow-400"
-              disabled={loading}
-              autoComplete="username"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-white/70 mb-1">Parol</label>
-            <input
-              type="password"
-              placeholder="Parolni kiriting"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setError(''); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit(); }}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-yellow-400"
-              disabled={loading}
-              autoComplete="current-password"
-            />
-          </div>
-
-          {error && (
-            <p className="text-red-400 text-sm text-center">{error}</p>
+          {step === 'phone' ? (
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Telefon raqam</label>
+              <input
+                type="tel"
+                placeholder="+998901234567"
+                value={phone}
+                onChange={e => { setPhone(e.target.value); setError(''); }}
+                onKeyDown={e => { if (e.key === 'Enter') void handleSend(); }}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-yellow-400"
+                disabled={loading}
+                autoFocus
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm text-white/70 mb-1">
+                {phone} raqamiga yuborilgan kod
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="----"
+                value={otp}
+                onChange={e => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 4)); setError(''); }}
+                onKeyDown={e => { if (e.key === 'Enter') void handleVerify(); }}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-widest placeholder-white/30 focus:outline-none focus:border-yellow-400"
+                disabled={loading}
+                autoFocus
+              />
+            </div>
           )}
 
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
           <button
-            onClick={() => void handleSubmit()}
+            onClick={() => void (step === 'phone' ? handleSend() : handleVerify())}
             disabled={loading}
-            className="w-full py-3 bg-yellow-400 text-black font-semibold rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 bg-yellow-400 text-black font-semibold rounded-xl text-base disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
           >
-            {loading && (
-              <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-            )}
-            Kirish
+            {loading && <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />}
+            {step === 'phone' ? 'Kod olish' : 'Kirish'}
           </button>
+
+          {step === 'otp' && (
+            <button
+              onClick={() => { setStep('phone'); setOtp(''); setError(''); }}
+              className="text-sm text-white/40 text-center hover:text-white/60"
+            >
+              ← Raqamni o'zgartirish
+            </button>
+          )}
         </div>
       </div>
     </div>
