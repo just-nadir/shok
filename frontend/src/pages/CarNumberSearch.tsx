@@ -100,7 +100,7 @@ export default function CarNumberSearch() {
         if (!phoneComplete) { setError("Telefon raqamini to'liq kiriting"); setLoading(false); return; }
         driver = await getDriverByPhone(phoneE164);
       }
-      navigate(`/rate/${encodeURIComponent(driver.qrCode)}?phone=bypass`);
+      navigate(`/rate/${encodeURIComponent(driver.id)}?phone=bypass`);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 404) setError(tab === 'car' ? 'Bu raqamli avtomobil topilmadi' : 'Bu telefon raqamli haydovchi topilmadi');
