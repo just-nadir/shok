@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDriverByCarNumber, getDriverByPhone, ApiError } from '../services/api';
+import { ApiError } from '../services/api';
+import type { Driver } from '../types';
+
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+
+async function getDriverByCarNumber(carNumber: string): Promise<Driver> {
+  const res = await fetch(`${BASE_URL}/drivers/car/${encodeURIComponent(carNumber)}`, { credentials: 'include' });
+  if (!res.ok) { const b = await res.json().catch(() => ({})) as { error?: string }; throw new ApiError(res.status, b.error ?? 'Xatolik'); }
+  return res.json() as Promise<Driver>;
+}
+
+async function getDriverByPhone(phone: string): Promise<Driver> {
+  const res = await fetch(`${BASE_URL}/drivers/phone/${encodeURIComponent(phone)}`, { credentials: 'include' });
+  if (!res.ok) { const b = await res.json().catch(() => ({})) as { error?: string }; throw new ApiError(res.status, b.error ?? 'Xatolik'); }
+  return res.json() as Promise<Driver>;
+}
 
 type Tab = 'car' | 'phone';
 

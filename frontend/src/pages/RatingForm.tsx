@@ -63,7 +63,7 @@ export default function RatingForm() {
         }
       })
       .finally(() => setLoadingDriver(false));
-  }, [qrCode]);
+  }, [driverId]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
