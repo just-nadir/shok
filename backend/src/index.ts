@@ -22,6 +22,8 @@ app.use(express.json());
 // Static — yuklangan rasmlar
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+app.set('trust proxy', 1);
+
 app.use(
   session({
     store: new PgSession({ pool, tableName: 'session' }),
@@ -31,6 +33,7 @@ app.use(
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 1 kun
     },
   })
