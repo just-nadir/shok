@@ -83,8 +83,9 @@ export async function sendOTP(phone: string): Promise<void> {
 
   const token = await getTextUpToken();
   const userId = getTextUpUserId();
+  const templateId = process.env.TEXTUP_TEMPLATE_ID || '088b0e9d-5e05-45fa-b53f-6acdd7e05006';
 
-  const message = `Shok Taksi: tasdiqlash kodi ${code}. 5 daqiqa ichida amal qiladi.`;
+  const message = `"Shok taksi" dasturiga kirish uchun tasdiqlash kodingiz: ${code}`;
 
   const smsRes = await fetch('https://sms-api.textup.uz/v1/send', {
     method: 'POST',
@@ -95,6 +96,7 @@ export async function sendOTP(phone: string): Promise<void> {
     body: JSON.stringify({
       message,
       userId,
+      templateId,
       recipients: [phone],
       name: `OTP-${phone}`,
     }),
@@ -116,6 +118,7 @@ export async function sendOTP(phone: string): Promise<void> {
         body: JSON.stringify({
           message,
           userId,
+          templateId,
           recipients: [phone],
           name: `OTP-${phone}`,
         }),
