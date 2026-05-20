@@ -17,10 +17,9 @@ export interface SessionUser {
 declare module 'express-session' {
   interface SessionData {
     user?: SessionUser;
-    otpPhone?: string;
-    // Auth route session fields
     userId?: string;
     role?: 'customer' | 'driver' | 'admin';
     phone?: string | null;
+    telegramId?: number;
   }
 }

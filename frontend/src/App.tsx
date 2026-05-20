@@ -4,7 +4,9 @@ import OfflineBanner from './components/OfflineBanner';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 
-const OTPVerify = React.lazy(() => import('./pages/OTPVerify'));
+const CustomerLogin = React.lazy(() => import('./pages/CustomerLogin'));
+const RatingForm = React.lazy(() => import('./pages/RatingForm'));
+const CarNumberSearch = React.lazy(() => import('./pages/CarNumberSearch'));
 const ComplaintForm = React.lazy(() => import('./pages/ComplaintForm'));
 const DriverSearch = React.lazy(() => import('./pages/DriverSearch'));
 const DriverLogin = React.lazy(() => import('./pages/DriverLogin'));
@@ -19,11 +21,13 @@ export default function App() {
     <BrowserRouter>
       <OfflineBanner />
       <ErrorBoundary>
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center"><span className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" /></div>}>
           <Routes>
-            <Route path="/otp" element={<OTPVerify />} />
+            <Route path="/customer/login" element={<CustomerLogin />} />
+            <Route path="/customer/search" element={<CarNumberSearch />} />
+            <Route path="/rate/:driverId" element={<RatingForm />} />
+            <Route path="/complaint/:driverId" element={<ComplaintForm />} />
             <Route path="/search" element={<DriverSearch />} />
-            <Route path="/r/:driverId" element={<ComplaintForm />} />
             <Route path="/driver/login" element={<DriverLogin />} />
             <Route
               path="/driver/dashboard"
@@ -58,8 +62,8 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/" element={<Navigate to="/otp" replace />} />
-            <Route path="*" element={<Navigate to="/otp" replace />} />
+            <Route path="/" element={<Navigate to="/customer/login" replace />} />
+            <Route path="*" element={<Navigate to="/customer/login" replace />} />
           </Routes>
         </Suspense>
       </ErrorBoundary>

@@ -1,19 +1,20 @@
 import { Router, Request, Response } from 'express';
-import bcrypt from 'bcrypt';
 import { query } from '../db/pool';
 import { validateRatingRequest } from '../validators/ratingValidator';
 
 // Ensure session types are loaded
 import '../types/index';
 
-const SALT_ROUNDS = 10;
-
 const router = Router();
 
 // POST /api/ratings
-// Requirements: 1.2, 5.1, 5.4, 7.6
 router.post('/', async (req: Request, res: Response): Promise<void> => {
-  // Validate request body
+  // Telegram orqali autentifikatsiya tekshirish
+  if (!req.session.telegramId) {
+    res.status(401).json({ error: 'Telegram orqali kiring', code: 'UNAUTHORIZED' });
+    return;
+  }
+
   const validation = validateRatingRequest(req.body);
   if (!validation.valid) {
     res.status(400).json({ error: validation.errors[0], code: 'VALIDATION_ERROR' });
@@ -22,7 +23,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   const {
     driverId,
-    phone,
     overallRating,
     cleanliness,
     politeness,
@@ -31,7 +31,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     comment,
   } = req.body as {
     driverId: string;
-    phone: string;
     overallRating: number;
     cleanliness?: string;
     politeness?: string;
@@ -40,7 +39,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     comment?: string;
   };
 
-  // Look up driver by ID
+  // Haydovchini tekshirish
   const driverResult = await query<{ id: string; is_blocked: boolean }>(
     `SELECT id, is_blocked FROM drivers WHERE id = $1 LIMIT 1`,
     [driverId]
@@ -58,34 +57,32 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // TODO: 24 soatlik limit — test uchun vaqtincha o'chirilgan
-  // const recentRatings = await query<{ phone_hash: string }>(
-  //   `SELECT phone_hash FROM ratings
-  //    WHERE driver_id = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
-  //   [driver.id]
-  // );
-  // for (const row of recentRatings.rows) {
-  //   const match = await bcrypt.compare(phone, row.phone_hash);
-  //   if (match) {
-  //     res.status(429).json({
-  //       error: 'Siz bu haydovchini bugun allaqachon baholagansiz',
-  //       code: 'ALREADY_RATED',
-  //     });
-  //     return;
-  //   }
-  // }
+  // 24 soatlik limit — telegram_user_id bo'yicha
+  const telegramId = req.session.telegramId;
+  const recentResult = await query<{ id: string }>(
+    `SELECT id FROM ratings
+     WHERE telegram_user_id = $1 AND driver_id = $2 AND created_at > NOW() - INTERVAL '24 hours'
+     LIMIT 1`,
+    [telegramId, driver.id]
+  );
 
-  // Hash phone and insert rating
-  const phoneHash = await bcrypt.hash(phone, SALT_ROUNDS);
+  if (recentResult.rows.length > 0) {
+    res.status(429).json({
+      error: 'Siz bu haydovchini bugun allaqachon baholagansiz',
+      code: 'ALREADY_RATED',
+    });
+    return;
+  }
 
+  // Baholash saqlash
   const insertResult = await query<{ id: string }>(
     `INSERT INTO ratings
-       (driver_id, phone_hash, overall_rating, cleanliness, politeness, driving_style, punctuality, comment)
+       (driver_id, telegram_user_id, overall_rating, cleanliness, politeness, driving_style, punctuality, comment)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id`,
     [
       driver.id,
-      phoneHash,
+      telegramId,
       overallRating,
       cleanliness ?? null,
       politeness ?? null,

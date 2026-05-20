@@ -13,7 +13,6 @@ export interface Driver {
 // Baholash so'rovi
 export interface RatingRequest {
   driverId: string;
-  phone: string;
   overallRating: 1 | 2 | 3 | 4 | 5;
   cleanliness?: 'good' | 'average' | 'bad';
   politeness?: 'good' | 'average' | 'bad';

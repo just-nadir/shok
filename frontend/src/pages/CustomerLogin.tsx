@@ -1,89 +1,124 @@
-import { useState, useCallback, type ChangeEvent } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 9);
-  let result = '';
-  if (digits.length > 0) result += digits.slice(0, 2);
-  if (digits.length > 2) result += ' ' + digits.slice(2, 5);
-  if (digits.length > 5) result += ' ' + digits.slice(5, 7);
-  if (digits.length > 7) result += ' ' + digits.slice(7, 9);
-  return result;
-}
+const TELEGRAM_CLIENT_ID = import.meta.env.VITE_TELEGRAM_CLIENT_ID || '8776345771';
 
-function isPhoneComplete(formatted: string): boolean {
-  return formatted.replace(/\D/g, '').length === 9;
-}
-
-function toE164(formatted: string): string {
-  return '+998' + formatted.replace(/\D/g, '');
+declare global {
+  interface Window {
+    Telegram?: {
+      Login?: {
+        init: (options: { client_id: number; request_access?: string[]; lang?: string }, callback: (data: { id_token?: string; error?: string }) => void) => void;
+        open: (callback?: (data: { id_token?: string; error?: string }) => void) => void;
+        auth: (options: { client_id: number; request_access?: string[]; lang?: string }, callback: (data: { id_token?: string; error?: string }) => void) => void;
+      };
+    };
+  }
 }
 
 export default function CustomerLogin() {
   const navigate = useNavigate();
-  const [phoneDisplay, setPhoneDisplay] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setPhoneDisplay(formatPhone(e.target.value));
+  // Telegram Login SDK yuklash
+  useEffect(() => {
+    if (document.getElementById('telegram-login-sdk')) return;
+    const script = document.createElement('script');
+    script.id = 'telegram-login-sdk';
+    script.src = 'https://telegram.org/js/telegram-login.js';
+    script.async = true;
+    document.head.appendChild(script);
   }, []);
 
-  const handleSubmit = () => {
-    if (!isPhoneComplete(phoneDisplay)) return;
-    sessionStorage.setItem('customerPhone', toE164(phoneDisplay));
-    navigate('/customer/search', { replace: true });
-  };
+  const handleTelegramAuth = useCallback(async (data: { id_token?: string; error?: string }) => {
+    if (data.error || !data.id_token) {
+      setError(data.error || 'Telegram orqali kirishda xato');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/telegram', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: data.id_token }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || 'Kirish xatosi');
+      }
+
+      // Muvaffaqiyatli — qidirish sahifasiga o'tish
+      navigate('/customer/search', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Xatolik yuz berdi');
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  const handleLogin = useCallback(() => {
+    setError('');
+    if (!window.Telegram?.Login) {
+      setError('Telegram SDK yuklanmadi. Sahifani yangilang.');
+      return;
+    }
+
+    window.Telegram.Login.auth(
+      {
+        client_id: Number(TELEGRAM_CLIENT_ID),
+        request_access: ['phone'],
+        lang: 'uz',
+      },
+      handleTelegramAuth
+    );
+  }, [handleTelegramAuth]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white px-4">
-      <div className="w-full max-w-sm bg-gray-900 rounded-2xl p-6 sm:p-8 shadow-xl">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-full bg-yellow-400 flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-sm flex flex-col items-center gap-6">
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-16 h-16 rounded-full bg-yellow-400 flex items-center justify-center">
+            <svg className="w-9 h-9 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 1h8zM13 8h4l3 3v5h-7V8z" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-white">Shok Taxi</h1>
-          <p className="text-sm text-white/60 mt-1">Telefon raqamingizni kiriting</p>
+          <h1 className="text-2xl font-bold text-white">Shok Taxi</h1>
+          <p className="text-white/50 text-sm text-center">Haydovchini baholash uchun Telegram orqali kiring</p>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm text-white/70 mb-1">Telefon raqam</label>
-            <div className="flex items-center bg-gray-800 border border-gray-700 rounded-xl focus-within:border-yellow-400 overflow-hidden">
-              <span className="pl-4 pr-2 text-white text-lg tracking-wider select-none shrink-0">+998</span>
-              <div className="w-px self-stretch bg-gray-700 my-2" />
-              <input
-                type="tel"
-                inputMode="numeric"
-                placeholder="XX XXX XX XX"
-                value={phoneDisplay}
-                onChange={handleChange}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-                className="flex-1 bg-transparent px-3 py-3 text-white placeholder-white/30 focus:outline-none text-lg tracking-wider"
-                autoFocus
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={!isPhoneComplete(phoneDisplay)}
-            className="w-full py-3 bg-yellow-400 text-black font-semibold rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-          >
-            Davom etish
-          </button>
-
-          <div className="flex items-center justify-center gap-1.5 mt-2">
-            <svg className="w-3.5 h-3.5 text-white/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        {/* Telegram Login Button */}
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 py-3.5 bg-[#2AABEE] hover:bg-[#229ED9] text-white font-semibold rounded-xl text-base transition-colors disabled:opacity-50"
+        >
+          {loading ? (
+            <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
             </svg>
-            <p className="text-xs text-white/40 text-center">
-              Barcha ma'lumotlaringiz sir saqlanadi
-            </p>
-          </div>
-        </div>
+          )}
+          Telegram orqali kirish
+        </button>
+
+        {error && (
+          <p className="text-red-400 text-sm text-center">{error}</p>
+        )}
+
+        <p className="text-white/30 text-xs text-center">
+          Telegram akkauntingiz orqali xavfsiz kirish. Telefon raqamingiz maxfiy saqlanadi.
+        </p>
       </div>
     </div>
   );

@@ -57,11 +57,6 @@ export function validateRatingRequest(req: unknown): ValidationResult {
     errors.push("driverId majburiy va satr bo'lishi kerak");
   }
 
-  // phone tekshiruvi
-  if (!body.phone || typeof body.phone !== 'string' || body.phone.trim() === '') {
-    errors.push("phone majburiy va satr bo'lishi kerak");
-  }
-
   // overallRating tekshiruvi
   if (!validateOverallRating(body.overallRating)) {
     errors.push(`overallRating ${MIN_RATING} dan ${MAX_RATING} gacha butun son bo'lishi kerak`);

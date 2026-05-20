@@ -1,19 +1,15 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import StarRating from '../components/StarRating';
 import CategoryRating from '../components/CategoryRating';
 import { getDriver, submitRating, ApiError } from '../services/api';
-import { saveOfflineRating, triggerBackgroundSync } from '../services/offlineQueue';
 import type { Driver, RatingRequest } from '../types';
 
 type CategoryValue = 'good' | 'average' | 'bad';
 
 export default function RatingForm() {
   const { driverId } = useParams<{ driverId: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const phone = searchParams.get('phone') ?? '';
 
   const [driver, setDriver] = useState<Driver | null>(null);
   const [driverError, setDriverError] = useState('');
@@ -30,16 +26,8 @@ export default function RatingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [offlineSaved, setOfflineSaved] = useState(false);
 
-  // Redirect if no phone
-  useEffect(() => {
-    if (!phone && driverId) {
-      navigate(`/otp?dr=${encodeURIComponent(driverId)}`, { replace: true });
-    }
-  }, [phone, driverId, navigate]);
-
-  // Fetch driver info
+  // Haydovchi ma'lumotlarini olish
   useEffect(() => {
     if (!driverId) return;
     setLoadingDriver(true);
@@ -52,14 +40,10 @@ export default function RatingForm() {
         }
       })
       .catch((err) => {
-        if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
-          if (err.status === 403) {
-            setDriverError('Bu haydovchi hozirda baholanmaydi');
-          } else {
-            setDriverError('QR kod yaroqsiz yoki topilmadi');
-          }
+        if (err instanceof ApiError && err.status === 403) {
+          setDriverError('Bu haydovchi hozirda baholanmaydi');
         } else {
-          setDriverError('QR kod yaroqsiz yoki topilmadi');
+          setDriverError('Haydovchi topilmadi');
         }
       })
       .finally(() => setLoadingDriver(false));
@@ -75,11 +59,10 @@ export default function RatingForm() {
       return;
     }
 
-    if (!driverId || !phone) return;
+    if (!driverId) return;
 
     const data: RatingRequest = {
       driverId,
-      phone,
       overallRating: overallRating as 1 | 2 | 3 | 4 | 5,
       ...(cleanliness && { cleanliness }),
       ...(politeness && { politeness }),
@@ -93,16 +76,14 @@ export default function RatingForm() {
       await submitRating(data);
       setSuccess(true);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 429) {
-        setSubmitError('Siz bu haydovchini bugun allaqachon baholagansiz');
-      } else if (!navigator.onLine || (err instanceof TypeError && (err as TypeError).message === 'Failed to fetch')) {
-        // Offline: save to IndexedDB and show offline confirmation
-        try {
-          await saveOfflineRating(data);
-          await triggerBackgroundSync();
-          setOfflineSaved(true);
-        } catch {
-          setSubmitError("Xatolik yuz berdi. Keyinroq urinib ko'ring");
+      if (err instanceof ApiError) {
+        if (err.status === 429) {
+          setSubmitError('Siz bu haydovchini bugun allaqachon baholagansiz');
+        } else if (err.status === 401) {
+          navigate('/customer/login', { replace: true });
+          return;
+        } else {
+          setSubmitError(err.message || "Xatolik yuz berdi");
         }
       } else {
         setSubmitError("Xatolik yuz berdi. Keyinroq urinib ko'ring");
@@ -112,8 +93,6 @@ export default function RatingForm() {
     }
   };
 
-  if (!phone) return null;
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-6 px-3 sm:py-8 sm:px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-md p-4 sm:p-6">
@@ -121,8 +100,7 @@ export default function RatingForm() {
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
             <svg className="w-6 h-6 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M5 13l4 4L19 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h1 className="text-lg font-bold text-gray-900">Haydovchini baholash</h1>
@@ -140,7 +118,7 @@ export default function RatingForm() {
           </div>
         )}
 
-        {!loadingDriver && driver && !success && !offlineSaved && (
+        {!loadingDriver && driver && !success && (
           <>
             {/* Driver info */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-center gap-4">
@@ -156,33 +134,23 @@ export default function RatingForm() {
                 <p className="font-semibold text-gray-900 text-base">{driver.fullName}</p>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                   <span className="text-sm text-gray-500 font-mono">{driver.carNumber}</span>
-                  {driver.carModel && (
-                    <span className="text-sm text-gray-400">{driver.carModel}</span>
-                  )}
-                  {driver.carColor && (
-                    <span className="text-sm text-gray-400">{driver.carColor}</span>
-                  )}
+                  {driver.carModel && <span className="text-sm text-gray-400">{driver.carModel}</span>}
                 </div>
               </div>
             </div>
 
             <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-5">
-              {/* Overall rating */}
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium text-gray-700">Umumiy baho <span className="text-red-500">*</span></label>
                 <StarRating value={overallRating} onChange={setOverallRating} disabled={submitting} />
-                {fieldError && (
-                  <p className="text-red-500 text-xs">{fieldError}</p>
-                )}
+                {fieldError && <p className="text-red-500 text-xs">{fieldError}</p>}
               </div>
 
-              {/* Category ratings */}
               <CategoryRating label="Tozalik" value={cleanliness} onChange={setCleanliness} disabled={submitting} />
               <CategoryRating label="Xushmuomalalik" value={politeness} onChange={setPoliteness} disabled={submitting} />
               <CategoryRating label="Haydash Uslubi" value={drivingStyle} onChange={setDrivingStyle} disabled={submitting} />
               <CategoryRating label="Vaqtida Kelish" value={punctuality} onChange={setPunctuality} disabled={submitting} />
 
-              {/* Comment */}
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium text-gray-700">Izoh (ixtiyoriy)</label>
                 <textarea
@@ -196,18 +164,14 @@ export default function RatingForm() {
                 <p className="text-xs text-gray-400 text-right">{comment.length}/500</p>
               </div>
 
-              {submitError && (
-                <p className="text-red-500 text-sm text-center">{submitError}</p>
-              )}
+              {submitError && <p className="text-red-500 text-sm text-center">{submitError}</p>}
 
               <button
                 type="submit"
                 disabled={submitting}
                 className="w-full py-3 bg-yellow-400 text-black font-semibold rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {submitting && (
-                  <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                )}
+                {submitting && <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />}
                 Baholash
               </button>
             </form>
@@ -223,19 +187,6 @@ export default function RatingForm() {
             </div>
             <p className="text-lg font-semibold text-gray-900 text-center">
               Baholingiz qabul qilindi. Rahmat!
-            </p>
-          </div>
-        )}
-
-        {offlineSaved && (
-          <div className="flex flex-col items-center py-8 gap-4">
-            <div className="w-16 h-16 rounded-full bg-amber-400 flex items-center justify-center">
-              <svg className="w-9 h-9 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </div>
-            <p className="text-base font-medium text-gray-800 text-center">
-              Oflayn rejim. Baholash saqlandi va keyinroq yuboriladi
             </p>
           </div>
         )}
