@@ -55,9 +55,10 @@ export default function CarNumberSearch() {
   useEffect(() => {
     if (checked.current) return;
     checked.current = true;
-    if (!sessionStorage.getItem('customerPhone')) {
-      navigate('/customer/login', { replace: true });
-    }
+    // Telegram auth tekshirish
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(res => { if (!res.ok) navigate('/customer/login', { replace: true }); })
+      .catch(() => navigate('/customer/login', { replace: true }));
   }, [navigate]);
 
   const clearError = () => setError('');
