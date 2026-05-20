@@ -4,11 +4,13 @@ import { query } from '../db/pool';
 // --- TextUp.uz token cache ---
 let textupToken: string | null = null;
 let textupTokenExpiry: number = 0;
+let textupUserId: string | null = null;
 
 /** Reset token cache — for testing only */
 export function _resetTokenCache(): void {
   textupToken = null;
   textupTokenExpiry = 0;
+  textupUserId = null;
 }
 
 async function getTextUpToken(): Promise<string> {
@@ -33,18 +35,30 @@ async function getTextUpToken(): Promise<string> {
     throw new Error(`TextUp.uz login xatosi: ${res.status}`);
   }
 
-  const data = (await res.json()) as { accessToken?: string };
+  const data = (await res.json()) as { accessToken?: string; user?: { id?: string } };
   const token = data?.accessToken;
+  const userId = data?.user?.id;
 
   if (!token) {
     throw new Error('TextUp.uz tokenini olishda xato');
   }
 
   textupToken = token;
+  if (userId) {
+    textupUserId = userId;
+  }
   // Token 25 daqiqa amal qiladi (xavfsizlik uchun erta yangilaymiz)
   textupTokenExpiry = Date.now() + 25 * 60 * 1000;
 
   return textupToken;
+}
+
+function getTextUpUserId(): string {
+  // Avval env dan, keyin login javobidan
+  const envUserId = process.env.TEXTUP_USER_ID;
+  if (envUserId) return envUserId;
+  if (textupUserId) return textupUserId;
+  throw new Error('TEXTUP_USER_ID mavjud emas. Login qiling yoki env ga qo\'shing');
 }
 
 // --- OTP generatsiya ---
@@ -68,11 +82,7 @@ export async function sendOTP(phone: string): Promise<void> {
   );
 
   const token = await getTextUpToken();
-  const userId = process.env.TEXTUP_USER_ID;
-
-  if (!userId) {
-    throw new Error('TEXTUP_USER_ID muhit o\'zgaruvchisi kerak');
-  }
+  const userId = getTextUpUserId();
 
   const message = `Shok Taksi: tasdiqlash kodi ${code}. 5 daqiqa ichida amal qiladi.`;
 
