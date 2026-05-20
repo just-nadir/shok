@@ -63,7 +63,7 @@ function getTextUpUserId(): string {
 
 // --- OTP generatsiya ---
 export function generateOTP(): string {
-  const digits = Math.floor(100000 + Math.random() * 900000);
+  const digits = Math.floor(1000 + Math.random() * 9000);
   return digits.toString();
 }
 
